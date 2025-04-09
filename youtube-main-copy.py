@@ -42,36 +42,25 @@ def main():
     for keyword in keyword_list:
         next_page_token = ""
         youtube = build("youtube", "v3", developerKey=api_key)
-    # while文でnextPageTokenがあるまで動画データを取得
-    while True:
-        # youtube.search().listで動画情報を取得。結果は辞書型
-        result = (
-            youtube.search()
-            .list(
-                part="snippet",  # 必須パラメーターのpart
-                q=keyword,  # 検索したい文字列を指定
-                maxResults=50,  # 1回の試行における最大の取得数
-                order="viewCount",  # 視聴回数が多い順に取得
-                publishedAfter=fromtime,  # いつから情報を検索するか？
-                type="video",  # 動画タイプ
-                regionCode="JP",  # 地域コード
-                pageToken=next_page_token,  # ページ送りのトークンの設定
+        # while文でnextPageTokenがあるまで動画データを取得
+        while True:
+            # youtube.search().listで動画情報を取得。結果は辞書型
+            result = (
+                youtube.search()
+                .list(
+                    part="snippet",  # 必須パラメーターのpart
+                    q=keyword,  # 検索したい文字列を指定
+                    maxResults=50,  # 1回の試行における最大の取得数
+                    order="viewCount",  # 視聴回数が多い順に取得
+                    publishedAfter=fromtime,  # いつから情報を検索するか？
+                    type="video",  # 動画タイプ
+                    regionCode="JP",  # 地域コード
+                    pageToken=next_page_token,  # ページ送りのトークンの設定
+                )
+                .execute()
             )
-            .execute()
-        )
-        print(result)  # 取得した情報を表示
 
-        # 動画数が50件以下ならば、dataに情報を追加してbreak
-        if len(result["items"]) < 50:
-            for item in result["items"]:
-                videoId = item["id"]["videoId"]
-                publishedAt = item["snippet"]["publishedAt"]
-                title = item["snippet"]["title"]
-                data.append([videoId, publishedAt, title, keyword])
-            break
-
-        # 動画数が50件より多い場合はページ送りのトークン(result['nextPageToken']を変数nextpagetokenに設定する
-        else:
+            # 動画数が50件より多い場合はページ送りのトークン(result['nextPageToken']を変数nextpagetokenに設定する
             for item in result["items"]:
                 videoId = item["id"]["videoId"]
                 publishedAt = item["snippet"]["publishedAt"]
@@ -80,21 +69,30 @@ def main():
             next_page_token = result.get("nextPageToken")
             if not next_page_token:
                 break
-    # もしも動画数が50件以下ならば、dataに情報を追加してbreak
 
-    # もしも動画数が50件より多い場合はページ送りのトークン(result['nextPageToken']を変数nextpagetokenに設定する
-
-    # data = [[videoId, 投稿日, 動画タイトル, 検索キーワード], [videoId, 投稿日, 動画タイトル, 検索キーワード], ...]
-    # datalength = len(data)
     # videoidリストを作成
-
+    videoid_list = []
+    for item in data:
+        videoid_list.append(item[0])
     # videoidリストの中の重複を取り除く
-
+    videoid_list = sorted(set(videoid_list), key=videoid_list.index)
     # 50のセットの数(次のデータ取得で最大50ずつしかデータが取れないため、50のセットの数を数えている)
     # math.ceilは小数点以下は繰り上げの割り算　例　math.ceil(3.4) = 4
+    data_length = len(data)
+    _set_50 = math.ceil(data_length / 50)
 
+    _id_list = []
+    for i in range(_set_50):
+        _id_list.append(",".join(videoid_list[i * 50 : (i + 1) * 50]))
     # 再生回数データを取得して、再生回数リストを作成
-
+    viewcount_list = []
+    for videoid in _id_list:
+        viewcount = (
+            youtube.videos()
+            .list(part="statistics", maxResults=50, id=videoid)
+            .execute()
+        )
+    print(videoid)
     # 動画情報を入れたデータフレームdf_dataの作成
 
     # 重複の削除 subsetで重複を判定する列を指定,inplace=Trueでデータフレームを新しくするかを指定,
