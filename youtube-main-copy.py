@@ -92,25 +92,29 @@ def main():
             .list(part="statistics", maxResults=50, id=videoid)
             .execute()
         )
-    print(videoid)
+        for item in viewcount["items"]:
+            id = item["id"]
+            viewcount = item["statistics"]["viewCount"]
+            viewcount_list.append([id, viewcount])
+
     # 動画情報を入れたデータフレームdf_dataの作成
-
+    df_data = pd.DataFrame(data, columns=["videoId", "publishtime", "title", "keyword"])
     # 重複の削除 subsetで重複を判定する列を指定,inplace=Trueでデータフレームを新しくするかを指定,
-
+    df_data.drop_duplicates(subset=["videoId"], inplace=True)
     # 動画のURL
-
+    df_data["url"] = "https://www.youtube.com/watch?v=" + df_data["videoId"]
     # 調査した日
-
+    df_data["search_date"] = dt.date.today().strftime("%Y-%m-%d")
     # 再生回数データを入れたデータフレームdf_viewcountの作成
-
+    df_viewcount = pd.DataFrame(viewcount_list, columns=["videoId", "viewcount"])
     # 2つのデータフレームのマージ
-
+    df_data = pd.merge(df_viewcount, df_data, on="videoId", how="left")
     # viewcountの列のデータを条件検索のためにint型にする(元データも変更)
-
+    df_data["viewcount"] = df_data["viewcount"].astype(int)
     # データフレームのviewcountに記載されている、再生回数が条件を満たす行だけを抽出
-
+    df_data = df_data.query("viewcount >= 100000")
     # viewcountの列のデータをint型から文字列型に戻している
-
+    df_data["viewcount"] = df_data["viewcount"].astype(str)
     # 共有設定したスプレッドシートの検索結果シートを開く
 
     # ワークシートに要素が書き込まれているかを確認
