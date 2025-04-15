@@ -8,7 +8,6 @@ import pandas as pd
 from dotenv import load_dotenv
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
-from pytz import timezone
 
 
 def main():
@@ -23,9 +22,8 @@ def main():
     ]
     # 認証情報設定
     # ダウンロードしたjsonファイル名をクレデンシャル変数に設定
-    credentials = Credentials.from_service_account_file(
-        "starlit-water-441012-p8-cfc85334a56d.json", scopes=scope
-    )
+    json_file = os.getenv("SERVICE_ACCOUNT_JSON")
+    credentials = Credentials.from_service_account_file(json_file, scopes=scope)
     # OAuth2の資格情報を使用してGoogle APIにログインします。
     gc = gspread.authorize(credentials)
 
@@ -113,20 +111,20 @@ def main():
     df_data["viewcount"] = df_data["viewcount"].astype(int)
     # データフレームのviewcountに記載されている、再生回数が条件を満たす行だけを抽出
     df_data = df_data.query("viewcount >= 100000")
-    # viewcountの列のデータをint型から文字列型に戻している
-    df_data["viewcount"] = df_data["viewcount"].astype(str)
+    df_data = df_data[["search_date", "keyword", "title", "url", "viewcount"]]
     # 共有設定したスプレッドシートの検索結果シートを開く
-
+    worksheet = gc.open_by_key(spreadsheet_key).worksheet("検索結果")
     # ワークシートに要素が書き込まれているかを確認
-
     # 見出し行（1行目)がない場合
+    if worksheet.get_all_values() == [[]]:
+        # 見出し行を作成
+        worksheet.append_row(["検索日", "キーワード", "タイトル", "URL", "再生回数"])
 
-    # もしdf_dataにデータが入っていない場合は書き込みをpass（Youtube APIで情報が取得されなかった場合)
-    # df_dataの行数
-
+    length = df_data.shape[0]  # df_dataの行数
     # df_dataにデータが入っている場合（Youtube APIで情報が見つかった場合)
-
-    # スプレッドシートに書き出す
+    if length > 0:
+        # スプレッドシートに書き出す
+        worksheet.update(range_name="A2", values=df_data.astype(str).values.tolist())
 
 
 if __name__ == "__main__":
