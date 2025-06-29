@@ -1,10 +1,12 @@
 # 必要なモジュールをimport
 import datetime as dt
+import json
 import math
 import os
 
 import gspread
 import pandas as pd
+import requests
 from dotenv import load_dotenv
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
@@ -112,6 +114,40 @@ def main():
     # データフレームのviewcountに記載されている、再生回数が条件を満たす行だけを抽出
     df_data = df_data.query("viewcount >= 100000")
     df_data = df_data[["search_date", "keyword", "title", "url", "viewcount"]]
+
+    # ファイルからトークンとユーザーIDを読み込み
+    channel_access_token = os.getenv("CHANNEL_ACCESS_TOKEN")
+    user_id = os.getenv("USER_ID")
+
+    # データフレームのデータを文字列型に変換
+    # 文字列型に変換しないとjoinで結合できないため
+    df_data = df_data.astype(str)
+    # lineに通知したいメッセージを入力
+    youtube_list = []
+    for i in range(df_data.shape[0]):
+        youtube_list.append("\n".join(df_data.iloc[i]))
+
+    message_text = "\n\n".join(youtube_list)
+
+    # LINE Messaging APIのエンドポイント
+    endpoint = "https://api.line.me/v2/bot/message/push"
+
+    # リクエストヘッダー
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {channel_access_token}",
+    }
+
+    # リクエストボディ
+    payload = {"to": user_id, "messages": [{"type": "text", "text": message_text}]}
+
+    # リクエストを送信
+    response = requests.post(endpoint, headers=headers, data=json.dumps(payload))
+
+    # 結果を表示
+    print(f"Status code: {response.status_code}")
+    print(f"Response: {response.text}")
+
     # 共有設定したスプレッドシートの検索結果シートを開く
     worksheet = gc.open_by_key(spreadsheet_key).worksheet("検索結果")
     # ワークシートに要素が書き込まれているかを確認
@@ -124,7 +160,7 @@ def main():
     # df_dataにデータが入っている場合（Youtube APIで情報が見つかった場合)
     if length > 0:
         # スプレッドシートに書き出す
-        worksheet.update(range_name="A2", values=df_data.astype(str).values.tolist())
+        worksheet.update(range_name="A2", values=df_data.values.tolist())
 
 
 if __name__ == "__main__":
